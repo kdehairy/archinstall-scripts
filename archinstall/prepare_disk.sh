@@ -45,6 +45,10 @@ printf "EFI partition size [512M]: "
 read -r EFI_SIZE
 EFI_SIZE=$(ensure_unit "${EFI_SIZE:-512M}")
 
+printf "Root volume size [50G]: "
+read -r ROOT_SIZE
+ROOT_SIZE=$(ensure_unit "${ROOT_SIZE:-25G}")
+
 printf "Create a swap volume? [y/N]: "
 read -r want_swap
 case "$want_swap" in
@@ -82,7 +86,7 @@ printf "%-20s  %8s  %-10s  %s\n" "  └─$CRYPT_NAME"          ""           "cr
 if [ "$USE_SWAP" -eq 1 ]; then
     printf "%-20s  %8s  %-10s  %s\n" "    ├─${VG_NAME}-swap" "$SWAP_SIZE" "lvm"   "swap"
 fi
-printf "%-20s  %8s  %-10s  %s\n" "    ├─${VG_NAME}-root"    "50G"        "lvm"   "ext4"
+printf "%-20s  %8s  %-10s  %s\n" "    ├─${VG_NAME}-root"    "$ROOT_SIZE" "lvm"   "ext4"
 printf "%-20s  %8s  %-10s  %s\n" "    └─${VG_NAME}-home"    "rest"       "lvm"   "ext4"
 echo ""
 
@@ -127,7 +131,7 @@ vgcreate "$VG_NAME" /dev/mapper/"$CRYPT_NAME"
 if [ "$USE_SWAP" -eq 1 ]; then
     lvcreate -L "$SWAP_SIZE" -n swap "$VG_NAME"
 fi
-lvcreate -L 50G      -n root "$VG_NAME"
+lvcreate -L "$ROOT_SIZE" -n root "$VG_NAME"
 lvcreate -l 100%FREE -n home "$VG_NAME"
 
 echo "==> Formatting logical volumes ..."

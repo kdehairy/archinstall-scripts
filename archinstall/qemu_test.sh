@@ -1,4 +1,5 @@
 #!/bin/sh
+
 set -e
 
 # Usage: ./qemu_test.sh <arch-iso> [image] [size]
@@ -10,7 +11,6 @@ IMAGE="${2:-target/arch-test.qcow2}"
 SIZE="${3:-60G}"
 RESOLUTION="${4:-1920x1080}"
 
-# ── sanity checks ─────────────────────────────────────────────────────────────
 
 if [ -z "$ISO" ]; then
     echo "Usage: $0 <arch-iso> [image] [size]" >&2
@@ -29,7 +29,7 @@ for cmd in qemu-system-x86_64 qemu-img; do
     fi
 done
 
-# ── EFI firmware ─────────────────────────────────────────────────────────────
+# EFI firmware
 
 OVMF_CODE="/usr/share/edk2/x64/OVMF_CODE.4m.fd"
 OVMF_VARS_SRC="/usr/share/edk2/x64/OVMF_VARS.4m.fd"
@@ -48,7 +48,7 @@ else
     echo ""
 fi
 
-# ── create image if needed ────────────────────────────────────────────────────
+# Disk image
 
 if [ ! -f "$IMAGE" ]; then
     echo "==> Creating $IMAGE ($SIZE) ..."
@@ -58,12 +58,8 @@ else
     echo "==> Using existing image $IMAGE ($(qemu-img info --output=human "$IMAGE" | grep "virtual size" | awk '{print $3, $4}'))"
 fi
 
-# ── display resolution ────────────────────────────────────────────────────────
-
 XRES="${RESOLUTION%x*}"
 YRES="${RESOLUTION#*x}"
-
-# ── launch ────────────────────────────────────────────────────────────────────
 
 echo "==> Launching QEMU ..."
 echo "    ISO:        $ISO"
@@ -76,7 +72,7 @@ echo ""
 if [ "$USE_EFI" -eq 1 ]; then
     exec qemu-system-x86_64 \
         -enable-kvm \
-        -m 4G \
+        -m 8G \
         -smp 4 \
         -cpu host \
         -vga none -device "virtio-vga,xres=${XRES},yres=${YRES}" \
@@ -90,7 +86,7 @@ if [ "$USE_EFI" -eq 1 ]; then
 else
     exec qemu-system-x86_64 \
         -enable-kvm \
-        -m 4G \
+        -m 8G \
         -smp 4 \
         -cpu host \
         -vga virtio \
