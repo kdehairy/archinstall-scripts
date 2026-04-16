@@ -43,7 +43,8 @@ pacman -S --noconfirm \
 		npm \
 		curl wget \
 		luarocks \
-		libusb-compat pcsclite ccid
+		libusb-compat pcsclite ccid \
+		less
 
 # smartcard
 systemctl enable pcscd
