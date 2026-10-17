@@ -151,7 +151,7 @@ echo ""
 echo "Root password:"
 passwd root
 
-echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel
+echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/10-wheel
 
 # Rust toolchain
 su - "$USERNAME" -c "rustup default stable"
@@ -159,7 +159,8 @@ su - "$USERNAME" -c "rustup default stable"
 pacman -Scc --noconfirm
 
 # paru
-echo "$USERNAME ALL=(ALL) NOPASSWD: /usr/bin/pacman" > /etc/sudoers.d/aur_install
+# sudoers.d is parsed in lexical order and the last match wins, so this must sort after 10-wheel
+echo "$USERNAME ALL=(ALL) NOPASSWD: /usr/bin/pacman" > /etc/sudoers.d/90-aur_install
 
 su - "$USERNAME" -c "git clone https://aur.archlinux.org/paru.git /tmp/paru && cd /tmp/paru && makepkg --noconfirm"
 pacman -U --noconfirm /tmp/paru/paru-*.pkg.tar.zst
@@ -168,7 +169,7 @@ rm -rf /tmp/paru
 # AUR packages
 su - "$USERNAME" -c "paru -S --noconfirm --skipreview kickoff dotter-rs zsh-zim-git"
 
-rm /etc/sudoers.d/aur_install
+rm /etc/sudoers.d/90-aur_install
 
 # Dotfiles
 su - "$USERNAME" -c "git clone https://codeberg.org/kdehairy/dotfiles.git /home/$USERNAME/.dotfiles"
