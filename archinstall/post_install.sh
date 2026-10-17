@@ -148,7 +148,7 @@ read -r USERNAME
 useradd -m -G wheel -s /usr/bin/zsh "$USERNAME"
 passwd "$USERNAME"
 echo ""
-printf "Root passoword"
+echo "Root password:"
 passwd root
 
 echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel

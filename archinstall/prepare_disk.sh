@@ -47,7 +47,7 @@ EFI_SIZE=$(ensure_unit "${EFI_SIZE:-512M}")
 
 printf "Root volume size [50G]: "
 read -r ROOT_SIZE
-ROOT_SIZE=$(ensure_unit "${ROOT_SIZE:-25G}")
+ROOT_SIZE=$(ensure_unit "${ROOT_SIZE:-50G}")
 
 printf "Create a swap volume? [y/N]: "
 read -r want_swap
