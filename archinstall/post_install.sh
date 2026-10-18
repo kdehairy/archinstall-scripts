@@ -2,6 +2,14 @@
 set -e
 
 # Runs inside arch-chroot. Called by install.sh — do not run directly.
+# Safe to re-run: every step checks or overwrites existing state.
+
+# Never leave the temporary NOPASSWD pacman rule behind, even if a step fails
+cleanup() {
+    rm -f /etc/sudoers.d/90-aur_install
+}
+trap cleanup EXIT
+trap 'exit 1' INT TERM HUP
 
 # Timezone
 ln -sf /usr/share/zoneinfo/Europe/Amsterdam /etc/localtime
@@ -14,14 +22,19 @@ echo "LANG=en_US.UTF-8" > /etc/locale.conf
 echo "KEYMAP=us"        > /etc/vconsole.conf
 
 # Hostname
-printf "Hostname: "
-read -r HOSTNAME
+CURRENT_HOSTNAME=$(cat /etc/hostname 2>/dev/null || true)
+HOSTNAME=""
+while [ -z "$HOSTNAME" ]; do
+    printf "Hostname%s: " "${CURRENT_HOSTNAME:+ [$CURRENT_HOSTNAME]}"
+    read -r HOSTNAME
+    HOSTNAME="${HOSTNAME:-$CURRENT_HOSTNAME}"
+done
 echo "${HOSTNAME}" > /etc/hostname
 
 # NTP
 systemctl enable systemd-timesyncd
 
-pacman -S --noconfirm \
+pacman -S --needed --noconfirm \
     iwd \
     pipewire pipewire-pulse pipewire-alsa pipewire-audio wireplumber \
     sway swaybg swaylock swayidle \
@@ -104,7 +117,7 @@ RouteMetric=100
 EOF
 
 # zram swap
-pacman -S --noconfirm zram-generator
+pacman -S --needed --noconfirm zram-generator
 cat > /etc/systemd/zram-generator.conf << 'EOF'
 [zram0]
 zram-size = ram / 2
@@ -116,7 +129,11 @@ sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect microcode modconf kms keyboar
 mkinitcpio -P
 
 # Bootloader (systemd-boot)
-bootctl install
+if bootctl is-installed > /dev/null 2>&1; then
+    bootctl --graceful update
+else
+    bootctl install
+fi
 
 cat > /boot/loader/loader.conf << 'EOF'
 default arch.conf
@@ -145,16 +162,31 @@ EOF
 printf "Username: "
 read -r USERNAME
 
-useradd -m -G wheel -s /usr/bin/zsh "$USERNAME"
-passwd "$USERNAME"
-echo ""
-echo "Root password:"
-passwd root
+if id "$USERNAME" > /dev/null 2>&1; then
+    usermod -aG wheel -s /usr/bin/zsh "$USERNAME"
+else
+    useradd -m -G wheel -s /usr/bin/zsh "$USERNAME"
+fi
+
+# Only prompt for passwords that are not set yet ("P" = usable password)
+for account in "$USERNAME" root; do
+    if [ "$(passwd -S "$account" | cut -d' ' -f2)" != "P" ]; then
+        echo ""
+        echo "Password for $account:"
+        passwd "$account"
+    fi
+done
 
 echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/10-wheel
 
-# Rust toolchain
-su - "$USERNAME" -c "rustup default stable"
+# Rust toolchain (an interrupted download leaves a toolchain dir without a manifest; reinstall it)
+su - "$USERNAME" -c '
+    if ! rustup run stable rustc --version > /dev/null 2>&1; then
+        rustup toolchain uninstall stable 2> /dev/null || rm -rf ~/.rustup/toolchains/stable-* ~/.rustup/update-hashes/stable-*
+        rustup toolchain install stable
+    fi
+    rustup default stable
+'
 
 pacman -Scc --noconfirm
 
@@ -162,17 +194,22 @@ pacman -Scc --noconfirm
 # sudoers.d is parsed in lexical order and the last match wins, so this must sort after 10-wheel
 echo "$USERNAME ALL=(ALL) NOPASSWD: /usr/bin/pacman" > /etc/sudoers.d/90-aur_install
 
-su - "$USERNAME" -c "git clone https://aur.archlinux.org/paru.git /tmp/paru && cd /tmp/paru && makepkg --noconfirm"
-pacman -U --noconfirm /tmp/paru/paru-*.pkg.tar.zst
-rm -rf /tmp/paru
+if ! command -v paru > /dev/null 2>&1; then
+    rm -rf /tmp/paru
+    su - "$USERNAME" -c "git clone https://aur.archlinux.org/paru.git /tmp/paru && cd /tmp/paru && makepkg --noconfirm"
+    pacman -U --noconfirm /tmp/paru/paru-*.pkg.tar.zst
+    rm -rf /tmp/paru
+fi
 
 # AUR packages
-su - "$USERNAME" -c "paru -S --noconfirm --skipreview kickoff dotter-rs zsh-zim-git"
+su - "$USERNAME" -c "paru -S --needed --noconfirm --skipreview kickoff dotter-rs zsh-zim-git"
 
-rm /etc/sudoers.d/90-aur_install
+rm -f /etc/sudoers.d/90-aur_install
 
-# Dotfiles
-su - "$USERNAME" -c "git clone https://codeberg.org/kdehairy/dotfiles.git /home/$USERNAME/.dotfiles"
+# Dotfiles (an existing checkout is left untouched)
+if [ ! -d "/home/${USERNAME}/.dotfiles" ]; then
+    su - "$USERNAME" -c "git clone https://codeberg.org/kdehairy/dotfiles.git /home/$USERNAME/.dotfiles"
+fi
 cat > "/home/${USERNAME}/.dotfiles/.dotter/local.toml" << 'EOF'
 packages = ["sway", "zsh", "tmux", "foot", "nvim", "os", "kickoff", "waybar"]
 EOF

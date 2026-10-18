@@ -36,12 +36,19 @@ case "$(grep -m1 '^vendor_id' /proc/cpuinfo)" in
         ;;
 esac
 
+# Only initialize a fresh pacman keyring on the first run
+if [ -d /mnt/etc/pacman.d/gnupg ]; then
+    KEYRING_OPT=""
+else
+    KEYRING_OPT="-K"
+fi
+
 echo "==> Installing base system ..."
-# shellcheck disable=SC2086  # $UCODE is intentionally unquoted so an empty value adds no argument
-pacstrap -K /mnt base linux linux-firmware lvm2 cryptsetup $UCODE
+# shellcheck disable=SC2086  # $KEYRING_OPT and $UCODE are unquoted so empty values add no argument
+pacstrap $KEYRING_OPT /mnt --needed base linux linux-firmware lvm2 cryptsetup $UCODE
 
 echo "==> Generating fstab ..."
-genfstab -U /mnt >> /mnt/etc/fstab
+genfstab -U /mnt > /mnt/etc/fstab
 
 echo "==> Copying post-install script ($VARIANT) ..."
 cp "$SCRIPT_DIR/$POST_INSTALL" /mnt/root/post_install.sh
