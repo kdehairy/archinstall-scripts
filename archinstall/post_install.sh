@@ -208,7 +208,7 @@ rm -f /etc/sudoers.d/90-aur_install
 
 # Dotfiles (an existing checkout is left untouched)
 if [ ! -d "/home/${USERNAME}/.dotfiles" ]; then
-    su - "$USERNAME" -c "git clone https://codeberg.org/kdehairy/dotfiles.git /home/$USERNAME/.dotfiles"
+    su - "$USERNAME" -c "git clone https://github.com/kdehairy/dotfiles.git /home/$USERNAME/.dotfiles"
 fi
 cat > "/home/${USERNAME}/.dotfiles/.dotter/local.toml" << 'EOF'
 packages = ["sway", "zsh", "tmux", "foot", "nvim", "os", "kickoff", "waybar"]
