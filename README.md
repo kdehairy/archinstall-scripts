@@ -11,6 +11,8 @@ archinstall/
 - prepare_disk.sh   partition, encrypt, format, and mount the target disk
 - install.sh        pacstrap the base system and hand off to post_install.sh
 - post_install.sh   runs inside the chroot; only invoked by install.sh
+- post_install_server.sh
+                    headless variant of post_install.sh (sshd, no desktop)
 - teardown_disk.sh  reverse prepare_disk.sh (unmount, close LUKS, deactivate LVM)
 - qemu_test.sh      boot the Arch ISO in QEMU/KVM to test the scripts end-to-end
 ```
@@ -41,7 +43,8 @@ wipe.
 
 2. Install the base system, then run post-install setup in the chroot
 ```sh
-./archinstall/install.sh
+./archinstall/install.sh          # Sway desktop (default)
+./archinstall/install.sh server   # headless server with SSH access
 ```
 
 3. Reboot into the new system
@@ -49,9 +52,14 @@ wipe.
 umount -R /mnt && swapoff -a && reboot
 ```
 
-`install.sh` copies `post_install.sh` into `/mnt/root/` and runs it via
-`arch-chroot`; it prompts interactively for hostname, username, and passwords.
-`post_install.sh` is not meant to be run directly.
+`install.sh` copies the selected post-install script into `/mnt/root/` and runs it
+via `arch-chroot`; it prompts interactively for hostname, username, and passwords.
+The server variant also asks for an SSH public key: if one is given, password login
+over SSH is disabled. Root login over SSH is always disabled. Neither post-install
+script is meant to be run directly.
+
+Note that the LUKS passphrase is still entered at the console on every boot, so a
+server needs local or out-of-band console access to come back up after a reboot.
 
 To undo `prepare_disk.sh` without rebooting (e.g. between test iterations):
 
